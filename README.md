@@ -41,8 +41,8 @@ There are two classes to inherit from:
 
 | Class | Description |
 | --- | --- |
-| `Terminauta::Command::BaseCommand` | Plain: options, args, help, subcommand dispatch and uncolored `#say`/`#yes?`/`#ask` (Io). No color support at all |
-| `Terminauta::Command::ColoredCommand` | BaseCommand plus `#colorize`/`#color_enabled?`, `color:`/`bold:` options in `#say`/`#yes?`/`#ask` and the built-in `--color`/`--no-color` flags (see below) |
+| `Terminauta::Command::BaseCommand` | Plain: options, args, help, subcommand dispatch and uncolored `#say`/`#yes?`/`#ask`/`#pick` (Io). No color support at all |
+| `Terminauta::Command::ColoredCommand` | BaseCommand plus `#colorize`/`#color_enabled?`, `color:`/`bold:` options in `#say`/`#yes?`/`#ask`/`#pick` and the built-in `--color`/`--no-color` flags (see below) |
 
 ### Class level DSL
 
@@ -71,6 +71,7 @@ There are two classes to inherit from:
 | `#say message, **options` | Prints a message on stdout. Extra options (`color:`/`bold:`) are accepted and ignored: same signature as the colored one |
 | `#yes? question, default:, **options` | Asks a yes/no question on stdout and reads the answer from stdin (see below). Extra options are accepted and ignored |
 | `#ask question, default:, **options` | Asks a question on stdout and reads a free-form answer from stdin (see below). Extra options are accepted and ignored |
+| `#pick question, choices, **options` | Shows an interactive picker on stdout and returns the selected choice (see below). Extra options are accepted and ignored: same signature as the colored one |
 | `.execute(argv, parent_command = nil)` | Builds the command from ARGV, runs it, returns a process exit status. `OptionError`s and `ValidationError`s are reported on stderr. `parent_command` is passed by the parent's dispatch |
 
 Both `#options` and `#arguments` are keyed by string and by symbol:
@@ -83,6 +84,7 @@ ColoredCommand adds:
 | `#say message, color:, bold:` | Overrides the plain `#say`: prints the message on stdout, colored when requested and enabled |
 | `#yes? question, default:, color:, bold:` | Overrides the plain `#yes?`: colors the question when requested, then asks it plainly |
 | `#ask question, default:, color:, bold:` | Overrides the plain `#ask`: colors the question when requested, then asks it plainly |
+| `#pick question, choices, color:, bold:, format_choices:` | Overrides the plain `#pick`: colors the question when requested, then picks plainly; with `format_choices: true` the choice labels get the same color/bold codes |
 | `#colorize text, color:, bold:` | Returns `text` wrapped in ANSI codes when colors are enabled, `text` itself otherwise |
 | `#color_enabled?` | Whether colored output is enabled (see below) |
 
@@ -182,14 +184,16 @@ command's to validate, e.g. by reusing the declared validator through
 
 ### Colored output and prompts
 
-`#say`, `#yes?` and `#ask` are part of the base (Io): every command can
-print messages and ask questions, without colors. Their plain versions
+`#say`, `#yes?`, `#ask` and `#pick` are part of the base (Io): every
+command can print messages, ask questions and pick from a list, without
+colors. Their plain versions
 accept the same options as the colored ones and ignore them, so code
 written for a colored command also runs unchanged on a plain one. Color
 support is the `ColoredCommand` extra (a plain `BaseCommand` rejects
 `--color`/`--no-color` as unknown options): its `#say` colors the
 message and its `#yes?` the question, only when colors are enabled,
-through the `color:`/`bold:` options.
+through the `color:`/`bold:` options. `#pick` colors the question the
+same way and, with `format_choices: true`, the choice labels too.
 
 ```ruby
 def run
@@ -221,6 +225,19 @@ default is given), flushes stdout and reads a line from stdin, returning
 the answer stripped of whitespace, or `default` on an empty answer or
 EOF.
 
+`#pick` shows an interactive picker: the question on one line, then the
+choices with a `>` cursor on the current one. The arrow keys or `j`/`k`
+move the cursor (wrapping around at both ends), enter or space selects
+and returns the chosen value, and Ctrl-C, ESC or EOF cancel, returning
+nil. Keys that are not part of the picker are ignored. `choices` is a
+list of values, or a Hash whose values are the labels shown and whose
+keys are the values returned, so picking a label returns its key:
+`pick 'Size', { s: 'Small', l: 'Large' }` shows Small and Large and
+returns `:s` or `:l`. While picking, stdin is put in raw mode (no echo,
+single keystrokes) and restored afterwards; on a TTY the list is redrawn
+in place, otherwise each state is printed again. An empty `choices`
+raises `ArgumentError`.
+
 ### Errors
 
 | Class | Raised when |
@@ -248,8 +265,8 @@ command/
     ├── help.rb            # help rendering
     ├── dispatch.rb        # subcommand delegation in #call
     ├── state.rb           # State singleton: process wide --color/--no-color choice
-    ├── io.rb              # plain output (#say, #ask) and yes/no prompts (#yes?)
-    ├── ui.rb              # colored output and the --color/--no-color flags
+    ├── io.rb              # plain output (#say, #ask), yes/no prompts (#yes?) and the interactive picker (#pick)
+    ├── ui.rb              # colored output, the colored #pick and the --color/--no-color flags
     ├── error.rb           # Command::Error, Command::OptionError
     └── validators/
         └── base_validator.rb # Validators::BaseValidator and ValidationError

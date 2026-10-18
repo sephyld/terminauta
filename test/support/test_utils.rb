@@ -8,6 +8,10 @@ module TestUtils
   # terminal. `spin test` gives the spinel and the CRuby run the same
   # stdin, so the input cannot come from a redirect: each run reopens
   # its own pipe with the same scripted answers.
+  #
+  # Under spinel a read that hits EOF sticks across reopen (the EOF
+  # flag is not cleared), so a test that reads to EOF must be the last
+  # one to feed stdin.
   def self.feed_stdin(input)
     reader, writer = IO.pipe
     writer.write(input)

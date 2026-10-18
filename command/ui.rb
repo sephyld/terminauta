@@ -78,6 +78,24 @@ module Terminauta
         super(text, default: default)
       end
 
+      # Shows an interactive picker, colored when requested and
+      # enabled, and returns the selected choice. Overrides Io#pick,
+      # which accepts the same options and ignores them: this version
+      # colorizes the question and hands it to the plain one. With
+      # format_choices: true the choice labels get the same color/bold
+      # codes as the question; the returned choice stays plain.
+      #
+      #   fruit = pick 'Pick a fruit', fruits, color: :green
+      #   size = pick 'Pick a size', sizes, color: :green, format_choices: true
+      def pick(question, choices, color: nil, bold: false, format_choices: false)
+        text = question.to_s
+        text = colorize(text, color: color, bold: bold) if color || bold
+        if format_choices && (color || bold)
+          choices = colorize_picker_choices(choices, color: color, bold: bold)
+        end
+        super(text, choices)
+      end
+
       # Returns +text+ wrapped in ANSI codes when colors are enabled,
       # +text+ itself otherwise.
       def colorize(text, color: nil, bold: false)
@@ -136,6 +154,27 @@ module Terminauta
         [['--color', 'Force colored output'], ['--no-color', 'Disable colored output']].select do |long, _description|
           self.class.options.find { _1.long == long }.nil?
         end
+      end
+
+      private
+
+      # Returns +choices+ as a Hash mapping the values to return to the
+      # colorized labels to display: a Hash keeps its keys and maps its
+      # values, an Array becomes value => colorized label, so the picker
+      # still returns the plain value (duplicate values collapse into
+      # one row).
+      def colorize_picker_choices(choices, color:, bold:)
+        colored = {}
+        if choices.is_a?(Hash)
+          choices.each do |key, label|
+            colored[key] = colorize(label, color: color, bold: bold)
+          end
+        else
+          choices.each do |value|
+            colored[value] = colorize(value, color: color, bold: bold)
+          end
+        end
+        colored
       end
     end
   end

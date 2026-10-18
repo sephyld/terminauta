@@ -16,8 +16,8 @@ This is a [ruby spinel](https://github.com/matz/spinel) command line framework.
 - `command/help.rb`: help rendering
 - `command/dispatch.rb`: subcommand delegation in #call
 - `command/state.rb`: State singleton: process wide --color/--no-color choice
-- `command/io.rb`: plain output (#say, #ask) and yes/no prompts (#yes?)
-- `command/ui.rb`: colored output and the --color/--no-color flags
+- `command/io.rb`: plain output (#say, #ask), yes/no prompts (#yes?) and the interactive picker (#pick)
+- `command/ui.rb`: colored output, the colored #pick and the --color/--no-color flags
 - `command/error.rb`: Command::Error, Command::OptionError
 - `command/validators/base_validator.rb`: Validators::BaseValidator and ValidationError
 
@@ -31,3 +31,10 @@ Ruby spinel has some limitations and some Ruby features are not vailable. There 
   runtime answers false where MRI answers true (use `ancestors.include?`
   instead); `Module#method_defined?` needs a compile-time-known class and
   a literal method name
+- No io/console: `IO#raw`/`IO#getch`/`IO#echo=` are compile-time
+  refusals, so the picker reads keys with `IO#getbyte` and toggles raw
+  mode with `stty` (re-enabling `opost`, which `raw` disables, so
+  newlines keep their carriage return)
+- `IO#reopen` does not clear the EOF flag: once a read on `$stdin` hits
+  EOF, later reads return nil even after reopen (a test that reads to
+  EOF must be the last one to feed stdin)
