@@ -69,18 +69,31 @@ module Terminauta
       # values are the labels shown in the list and the keys are the
       # values returned, so picking a label returns its key.
       #
+      # With +multi: true+ the picker becomes a multi-select and
+      # returns the selected choices as an Array (in choice order), or
+      # nil when cancelled: each choice gets a '[x]'/'[ ]' checkbox,
+      # space toggles the one under the cursor and enter confirms the
+      # selection.
+      #
       #   fruit = pick 'Pick a fruit', ['Apple', 'Banana', 'Cherry']
       #   size = pick 'Pick a size', { s: 'Small', l: 'Large' }
-      def pick(question, choices, **_options)
+      #   fruits = pick 'Pick fruits', ['Apple', 'Banana'], multi: true
+      def pick(question, choices, multi: false, **_options)
         raise ArgumentError, 'pick needs at least one choice' if choices.empty?
 
         labels = choices.is_a?(Hash) ? choices.values : choices
         values = choices.is_a?(Hash) ? choices.keys : choices
 
         $stdout.puts question.to_s
-        render_picker_choices(labels, 0, false)
-        index = with_picker_terminal { run_picker_loop(labels) }
-        index.nil? ? nil : values[index]
+        if multi
+          render_picker_choices(labels, 0, false, selected: [])
+          indexes = with_picker_terminal { run_multi_picker_loop(labels) }
+          indexes.nil? ? nil : indexes.map { |index| values[index] }
+        else
+          render_picker_choices(labels, 0, false)
+          index = with_picker_terminal { run_picker_loop(labels) }
+          index.nil? ? nil : values[index]
+        end
       end
 
       private
@@ -106,19 +119,51 @@ module Terminauta
         end
       end
 
+      # The multi-select picker loop: reads keys until enter confirms
+      # or the picker is cancelled, redrawing the choices on every move
+      # and toggle. Returns the selected indexes in ascending order, or
+      # nil when cancelled.
+      def run_multi_picker_loop(choices)
+        cursor = 0
+        selected = []
+        loop do
+          case read_picker_key(multi: true)
+          when :up
+            cursor = (cursor - 1) % choices.length
+            render_picker_choices(choices, cursor, true, selected: selected)
+          when :down
+            cursor = (cursor + 1) % choices.length
+            render_picker_choices(choices, cursor, true, selected: selected)
+          when :toggle
+            if selected.include?(cursor)
+              selected.delete(cursor)
+            else
+              selected << cursor
+            end
+            render_picker_choices(choices, cursor, true, selected: selected)
+          when :select
+            return selected.sort
+          when :cancel
+            return nil
+          end
+        end
+      end
+
       # Reads one key from stdin and translates it to a picker action:
       # :up, :down, :select, :cancel, or nil for keys to ignore. Keys
       # are read byte by byte with IO#getbyte (spinel implements neither
-      # IO#getch nor IO#raw): enter is CR or LF, space selects, 'j'/'k'
-      # move down/up, Ctrl-C cancels, and ESC starts an escape sequence
-      # (the arrow keys) or cancels when it stands alone.
-      def read_picker_key
+      # IO#getch nor IO#raw): enter is CR or LF, space selects (or
+      # toggles the checkbox under the cursor with +multi: true+),
+      # 'j'/'k' move down/up, Ctrl-C cancels, and ESC starts an escape
+      # sequence (the arrow keys) or cancels when it stands alone.
+      def read_picker_key(multi: false)
         byte = $stdin.getbyte
         return :cancel if byte.nil?
 
         case byte
         when 3 then :cancel
-        when 10, 13, 32 then :select
+        when 10, 13 then :select
+        when 32 then multi ? :toggle : :select
         when 106 then :down
         when 107 then :up
         when 27 then read_picker_escape
@@ -149,15 +194,23 @@ module Terminauta
       end
 
       # Prints the choices with the cursor marker on the choice at
-      # +cursor+. On a redraw on a TTY, moves the cursor up over the
+      # +cursor+. With +selected+ (an Array of indexes, for the
+      # multi-select picker) each choice also gets a '[x]'/'[ ]'
+      # checkbox; without it the choices print plain, as #pick shows
+      # them. On a redraw on a TTY, moves the cursor up over the
       # previous rendering and clears it first, so the list is updated
       # in place; otherwise (first render, or stdout not a TTY) the
       # choices are simply printed again.
-      def render_picker_choices(choices, cursor, redraw)
+      def render_picker_choices(choices, cursor, redraw, selected: nil)
         $stdout.print "\e[#{choices.length}A\e[J" if redraw && $stdout.tty?
         choices.each_with_index do |choice, index|
           marker = index == cursor ? '>' : ' '
-          $stdout.puts "#{marker} #{choice}"
+          if selected.nil?
+            $stdout.puts "#{marker} #{choice}"
+          else
+            box = selected.include?(index) ? '[x]' : '[ ]'
+            $stdout.puts "#{marker} #{box} #{choice}"
+          end
         end
         $stdout.flush
       end

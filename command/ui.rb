@@ -83,17 +83,16 @@ module Terminauta
       # which accepts the same options and ignores them: this version
       # colorizes the question and hands it to the plain one. With
       # format_choices: true the choice labels get the same color/bold
-      # codes as the question; the returned choice stays plain.
+      # codes as the question; the returned choice stays plain. With
+      # multi: true the picker selects several choices and returns them
+      # as an Array.
       #
       #   fruit = pick 'Pick a fruit', fruits, color: :green
       #   size = pick 'Pick a size', sizes, color: :green, format_choices: true
-      def pick(question, choices, color: nil, bold: false, format_choices: false)
-        text = question.to_s
-        text = colorize(text, color: color, bold: bold) if color || bold
-        if format_choices && (color || bold)
-          choices = colorize_picker_choices(choices, color: color, bold: bold)
-        end
-        super(text, choices)
+      #   fruits = pick 'Pick fruits', fruits, multi: true, color: :green
+      def pick(question, choices, color: nil, bold: false, format_choices: false, multi: false)
+        text, choices = colorize_picker_parts(question, choices, color: color, bold: bold, format_choices: format_choices)
+        super(text, choices, multi: multi)
       end
 
       # Returns +text+ wrapped in ANSI codes when colors are enabled,
@@ -157,6 +156,18 @@ module Terminauta
       end
 
       private
+
+      # Colorizes the picker question and, with format_choices:, the
+      # choice labels; returns the [question, choices] pair to hand to
+      # the plain picker.
+      def colorize_picker_parts(question, choices, color:, bold:, format_choices:)
+        text = question.to_s
+        text = colorize(text, color: color, bold: bold) if color || bold
+        if format_choices && (color || bold)
+          choices = colorize_picker_choices(choices, color: color, bold: bold)
+        end
+        [text, choices]
+      end
 
       # Returns +choices+ as a Hash mapping the values to return to the
       # colorized labels to display: a Hash keeps its keys and maps its

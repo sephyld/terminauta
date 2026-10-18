@@ -71,7 +71,7 @@ There are two classes to inherit from:
 | `#say message, **options` | Prints a message on stdout. Extra options (`color:`/`bold:`) are accepted and ignored: same signature as the colored one |
 | `#yes? question, default:, **options` | Asks a yes/no question on stdout and reads the answer from stdin (see below). Extra options are accepted and ignored |
 | `#ask question, default:, **options` | Asks a question on stdout and reads a free-form answer from stdin (see below). Extra options are accepted and ignored |
-| `#pick question, choices, **options` | Shows an interactive picker on stdout and returns the selected choice (see below). Extra options are accepted and ignored: same signature as the colored one |
+| `#pick question, choices, multi:, **options` | Shows an interactive picker on stdout and returns the selected choice (see below); with `multi: true` the picker becomes a multi-select and returns an Array of the selected choices. Extra options are accepted and ignored: same signature as the colored one |
 | `.execute(argv, parent_command = nil)` | Builds the command from ARGV, runs it, returns a process exit status. `OptionError`s and `ValidationError`s are reported on stderr. `parent_command` is passed by the parent's dispatch |
 
 Both `#options` and `#arguments` are keyed by string and by symbol:
@@ -84,7 +84,7 @@ ColoredCommand adds:
 | `#say message, color:, bold:` | Overrides the plain `#say`: prints the message on stdout, colored when requested and enabled |
 | `#yes? question, default:, color:, bold:` | Overrides the plain `#yes?`: colors the question when requested, then asks it plainly |
 | `#ask question, default:, color:, bold:` | Overrides the plain `#ask`: colors the question when requested, then asks it plainly |
-| `#pick question, choices, color:, bold:, format_choices:` | Overrides the plain `#pick`: colors the question when requested, then picks plainly; with `format_choices: true` the choice labels get the same color/bold codes |
+| `#pick question, choices, color:, bold:, format_choices:, multi:` | Overrides the plain `#pick`: colors the question when requested, then picks plainly; with `format_choices: true` the choice labels get the same color/bold codes; with `multi: true` the picker selects several choices and returns them as an Array |
 | `#colorize text, color:, bold:` | Returns `text` wrapped in ANSI codes when colors are enabled, `text` itself otherwise |
 | `#color_enabled?` | Whether colored output is enabled (see below) |
 
@@ -238,6 +238,14 @@ single keystrokes) and restored afterwards; on a TTY the list is redrawn
 in place, otherwise each state is printed again. An empty `choices`
 raises `ArgumentError`.
 
+With `multi: true` the picker becomes a multi-select: each choice gets
+a `[x]`/`[ ]` checkbox, space toggles the one under the cursor, enter
+confirms and returns the selected values as an Array in choice order
+(an empty Array when nothing is picked), and Ctrl-C, ESC or EOF cancel,
+returning nil: `pick 'Fruits', ['Apple', 'Banana'], multi: true` returns
+e.g. `['Apple']`. A Hash works the same way: the Array holds the keys
+of the picked labels.
+
 ### Errors
 
 | Class | Raised when |
@@ -265,7 +273,7 @@ command/
     ├── help.rb            # help rendering
     ├── dispatch.rb        # subcommand delegation in #call
     ├── state.rb           # State singleton: process wide --color/--no-color choice
-    ├── io.rb              # plain output (#say, #ask), yes/no prompts (#yes?) and the interactive picker (#pick)
+    ├── io.rb              # plain output (#say, #ask), yes/no prompts (#yes?) and the interactive picker (#pick, single or multi select)
     ├── ui.rb              # colored output, the colored #pick and the --color/--no-color flags
     ├── error.rb           # Command::Error, Command::OptionError
     └── validators/

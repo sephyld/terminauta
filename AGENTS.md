@@ -16,7 +16,7 @@ This is a [ruby spinel](https://github.com/matz/spinel) command line framework.
 - `command/help.rb`: help rendering
 - `command/dispatch.rb`: subcommand delegation in #call
 - `command/state.rb`: State singleton: process wide --color/--no-color choice
-- `command/io.rb`: plain output (#say, #ask), yes/no prompts (#yes?) and the interactive picker (#pick)
+- `command/io.rb`: plain output (#say, #ask), yes/no prompts (#yes?) and the interactive picker (#pick, single or multi select)
 - `command/ui.rb`: colored output, the colored #pick and the --color/--no-color flags
 - `command/error.rb`: Command::Error, Command::OptionError
 - `command/validators/base_validator.rb`: Validators::BaseValidator and ValidationError

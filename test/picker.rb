@@ -3,7 +3,10 @@
 # Interactive picker (see command/io.rb and command/ui.rb): #pick
 # renders a question and a list of choices, moves the cursor with the
 # arrow keys or j/k, selects with enter or space and cancels with
-# Ctrl-C, ESC or EOF (returning nil). The keystrokes are fed scripted
+# Ctrl-C, ESC or EOF (returning nil). With multi: true the picker
+# becomes a multi-select: space toggles a checkbox under the cursor,
+# enter confirms and returns the selected values as an Array. The
+# keystrokes are fed scripted
 # through stdin (see TestUtils.feed_stdin): escape sequences for the
 # arrow keys, j/k, enter, space, Ctrl-C and EOF. Run under `spin test`,
 # which diffs the spinel compiled output against a plain CRuby run of
@@ -198,9 +201,128 @@ end
 TestUtils.feed_stdin("\r")
 run(PlainPickerCommand, [])
 
+# Multi-select: space toggles the checkbox under the cursor, enter
+# confirms and returns the selected values in choice order.
+class MultiPickerCommand < Terminauta::Command::BaseCommand
+  command_name 'multipicker'
+
+  def run
+    puts "picked=#{pick('Pick fruits', ['Apple', 'Banana', 'Cherry'], multi: true).inspect}"
+    0
+  end
+end
+
+# Toggle the first choice, enter confirms.
+TestUtils.feed_stdin(" \r")
+run(MultiPickerCommand, [])
+
+# Toggle several choices: the result keeps the choice order, not the
+# toggle order (Cherry is toggled first, then Apple).
+TestUtils.feed_stdin("jj kk \r")
+run(MultiPickerCommand, [])
+
+# Toggling a choice twice unselects it: nothing stays picked.
+TestUtils.feed_stdin("  \r")
+run(MultiPickerCommand, [])
+
+# Enter without toggling anything returns an empty Array.
+TestUtils.feed_stdin("\r")
+run(MultiPickerCommand, [])
+
+# The cursor wraps around: k on the first choice moves to the last.
+TestUtils.feed_stdin("k \r")
+run(MultiPickerCommand, [])
+
+# Ctrl-C cancels: the multi-select #pick returns nil.
+TestUtils.feed_stdin("\x03")
+run(MultiPickerCommand, [])
+
+# A Hash maps the returned values (the keys) to the displayed labels
+# (the values): the labels are listed, the keys are returned.
+class HashMultiPickerCommand < Terminauta::Command::BaseCommand
+  command_name 'hashmultipicker'
+
+  def run
+    puts "picked=#{pick('Pick a size', { s: 'Small', l: 'Large' }, multi: true).inspect}"
+    0
+  end
+end
+
+TestUtils.feed_stdin(" j \r")
+run(HashMultiPickerCommand, [])
+
+# An empty choice list is rejected in multi mode too.
+class EmptyMultiPickerCommand < Terminauta::Command::BaseCommand
+  command_name 'emptymultipicker'
+
+  def run
+    pick('Pick nothing', [], multi: true)
+    0
+  end
+end
+
+begin
+  EmptyMultiPickerCommand.new([]).call
+rescue ArgumentError => e
+  puts "empty=#{e.message.inspect}"
+end
+
+# An empty Hash is rejected in multi mode too.
+class EmptyHashMultiPickerCommand < Terminauta::Command::BaseCommand
+  command_name 'emptyhashmultipicker'
+
+  def run
+    pick('Pick nothing', {}, multi: true)
+    0
+  end
+end
+
+begin
+  EmptyHashMultiPickerCommand.new([]).call
+rescue ArgumentError => e
+  puts "empty=#{e.message.inspect}"
+end
+
+# The colored multi-select #pick colorizes the question and, with
+# format_choices:, the choice labels; the returned values stay plain.
+class ColoredMultiPickerCommand < Terminauta::Command::ColoredCommand
+  command_name 'coloredmultipicker'
+
+  def run
+    puts "picked=#{pick('Pick fruits', ['Apple', 'Banana'], multi: true, color: :green, bold: true, format_choices: true).inspect}"
+    0
+  end
+end
+
+Terminauta::Command::Ui.color_override = true
+TestUtils.feed_stdin(" \r")
+run(ColoredMultiPickerCommand, [])
+Terminauta::Command::Ui.color_override = nil
+
+# A plain BaseCommand accepts and ignores the color options in multi
+# mode too.
+class PlainMultiPickerCommand < Terminauta::Command::BaseCommand
+  command_name 'plainmultipicker'
+
+  def run
+    puts "picked=#{pick('Pick fruits', ['Apple', 'Banana'], multi: true, color: :red, bold: true, format_choices: true).inspect}"
+    0
+  end
+end
+
+TestUtils.feed_stdin(" \r")
+run(PlainMultiPickerCommand, [])
+
 # ESC cancels too, and so does EOF (no input at all). Both read stdin
 # to EOF, so they must stay last (see the header comment).
 TestUtils.feed_stdin("\e")
 run(PickerCommand, [])
 TestUtils.feed_stdin('')
 run(PickerCommand, [])
+
+# The multi-select picker cancels the same way: ESC and EOF return nil.
+# Both read stdin to EOF, so they stay last too.
+TestUtils.feed_stdin("\e")
+run(MultiPickerCommand, [])
+TestUtils.feed_stdin('')
+run(MultiPickerCommand, [])
